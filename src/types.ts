@@ -3,4 +3,9 @@ export type CardType = {
   emoji: string;
   matched: boolean;
   flipped: boolean;
-}
+};
+
+export type TypingWord = {
+  word: string;
+  words: string[];
+};
