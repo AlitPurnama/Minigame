@@ -4,10 +4,20 @@
   import type { CardType } from "../types";
   import { flip } from "svelte/animate";
   import { quadInOut } from "svelte/easing";
+  import { RotateCw } from "lucide-svelte";
   import { fade } from "svelte/transition";
-
   let OpenCard1: CardType | null = null;
   let OpenCard2: CardType | null = null;
+
+  let AllMatched = false;
+
+  type timer = {
+    minutes: number;
+    seconds: number;
+    hours: number;
+  };
+
+  let timer: timer = null!;
 
   // NOTE: Use nerd font so you can see the symbol below
   let SymbolList = [
@@ -47,6 +57,9 @@
 
   // TODO: Rework DoFlip and ResetFlip function must be the stupidiest thing I've ever done
   function DoFlip(id: string) {
+    if (!timer) {
+      StartTimer();
+    }
     if ((OpenCard1 && OpenCard2) !== null) return;
     if (!OpenCard1) {
       console.log("DOFLIP");
@@ -141,10 +154,79 @@
     }
   }
 
+  let intervalID: number = null!;
+  let formattedTime = "";
+
+  function GetFormattedTime() {
+    let hours = "";
+    let minutes = "";
+    let seconds = "";
+    if (timer.seconds.toString().length === 1) {
+      seconds = `0${timer.seconds}`;
+    } else {
+      seconds = timer.seconds.toString();
+    }
+    if (timer.minutes.toString().length === 1) {
+      minutes = `0${timer.minutes}`;
+    } else {
+      minutes = timer.minutes.toString();
+    }
+    if (timer.hours) {
+      if (timer.hours.toString().length === 1) {
+        console.log(timer.hours);
+        hours = `0${timer.hours}`;
+      } else {
+        hours = timer.hours.toString();
+      }
+    }
+    console.table({ hours, minutes, seconds });
+    return hours.length
+      ? `${hours}:${minutes}:${seconds}`
+      : `${minutes}:${seconds}`;
+  }
+
   function IsAllMatch() {
+    if (!$MemoryStore.length) return (AllMatched = false);
     const MatchedData = $MemoryStore.filter((x) => x.matched);
-    if (MatchedData.length !== $MemoryStore.length) return;
-    return true;
+    if (MatchedData.length !== $MemoryStore.length) {
+      AllMatched = false;
+      return;
+    }
+    clearInterval(intervalID);
+    AllMatched = true;
+    return;
+  }
+
+  function StartTimer() {
+    if (intervalID) {
+      clearInterval(intervalID);
+    }
+    if (!timer) {
+      timer = {
+        seconds: 1,
+        minutes: 0,
+        hours: 0,
+      };
+      formattedTime = GetFormattedTime();
+    }
+    intervalID = setInterval(() => {
+      if (timer.seconds + 1 >= 60) {
+        timer.seconds = 0;
+        timer.minutes++;
+      } else if (timer.minutes + 1 >= 60) {
+        timer.minutes = 0;
+        timer.hours++;
+      } else {
+        timer.seconds++;
+      }
+      formattedTime = GetFormattedTime();
+    }, 1000);
+  }
+
+  function ResetState() {
+    timer = null!;
+    formattedTime = "";
+    GenerateData();
   }
 
   function GenerateData() {
@@ -172,29 +254,48 @@
   $: $MemoryStore, IsAllMatch();
 </script>
 
-<pre>
-  {JSON.stringify(OpenCard1)}
-  {JSON.stringify(OpenCard2)}
-</pre>
 <div class="memory-card-wrapper">
-  <div class="relative grid place-items-center overflow-hidden">
+  <div class="relative overflow-hidden">
+    <p class="text-xl text-blue-200" class:text-green-200={AllMatched}>
+      {#if timer}
+        {formattedTime}
+      {:else}
+        Flip the card to start
+      {/if}
+    </p>
     <div
-      class="border border-blue-200 rounded mt-5 p-2 grid grid-cols-4 gap-2 w-fit"
+      class:border-green-300={AllMatched}
+      class="border border-blue-200 rounded w-fit overflow-hidden relative"
     >
-      {#each $MemoryStore as { id, emoji, matched, flipped } (id)}
-        <button
-          class="card"
-          animate:flip={{ duration: 400, easing: quadInOut }}
-          class:flipped={flipped || matched}
-          on:click={() => {
-            ClickCard(id);
-          }}
+      {#if AllMatched}
+        <div
+          transition:fade={{ duration: 300 }}
+          class="absolute left-0 top-0 z-10 flex flex-col items-center justify-center bg-gray-950/70 backdrop-blur-sm w-full h-full"
         >
-          <div class="back">
-            {emoji}
-          </div>
-        </button>
-      {/each}
+          <button
+            on:click={ResetState}
+            class="square-12 text-xl transform hover:scale-110 transition-transform ease-in-out duration-400 grid items-center justify-center mt-5 rounded border border-blue-200"
+          >
+            <RotateCw class="square-8 " />
+          </button>
+        </div>
+      {/if}
+      <div class="p-2 grid grid-cols-4 gap-2">
+        {#each $MemoryStore as { id, emoji, matched, flipped } (id)}
+          <button
+            class="card"
+            animate:flip={{ duration: 400, easing: quadInOut }}
+            class:flipped={flipped || matched}
+            on:click={() => {
+              ClickCard(id);
+            }}
+          >
+            <div class="back">
+              {emoji}
+            </div>
+          </button>
+        {/each}
+      </div>
     </div>
   </div>
 </div>
